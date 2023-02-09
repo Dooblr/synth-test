@@ -5,7 +5,7 @@ $accentColor:#34E4EA;
 #app-container{
   min-height:100vh;
   min-width:100vw;
-  background-color: #02020A;
+  // background-color: #02020A;
 }
 
 .text{
@@ -44,8 +44,15 @@ $accentColor:#34E4EA;
   width:10rem;
 }
 
-.radio-waveform{
+.radio-group{
   *{
     color:white;
   }
+  display: grid;
+  grid-template-columns: 1rem;
+  width:100%;
+}
+
+.dropdown-select{
+  width: 60%;
 }

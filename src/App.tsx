@@ -1,7 +1,9 @@
 import { HStack, VStack } from '@chakra-ui/react';
-import { Button, Container, MantineProvider, Radio, Slider, Text } from '@mantine/core';
+import { Badge, Button, Container, MantineProvider, Radio, Select, Slider, Text } from '@mantine/core';
 import { useState } from 'react';
 import './App.scss';
+import Keyboard from './Keyboard';
+import { mtof } from './utils';
 
 let actx = new AudioContext()
 let out = actx.destination
@@ -13,28 +15,40 @@ let filterNode = actx.createBiquadFilter()
 function App() {
 
   // Osc
-  const [freq,setFreq] = useState(440)
+  const [oscFreq,setOscFreq] = useState(440)
   const [gain,setGain] = useState(0.1)
   const [waveForm,setWaveform] = useState('sine' as OscillatorType)
 
-  // Filter
-  const [filterFreq,setFilterFreq] = useState(1000.0)
+  // Filter ============================================================== //
+
+  // frequency
+  const [filterFreq,setFilterFreq] = useState(20000.0)
   const [filterKnob,setFilterKnob] = useState(1.0)
+
+  // Q
   const [filterQ,setFilterQ] = useState(1.0)
   const [filterType,setFilterType] = useState('lowpass')
   const [filterGain,setFilterGain] = useState(1.0)
 
   // Osc handlers
-  function startOsc(){
+  function startOsc(midiNote:number){
+
     // Stop previous osc
     oscNode.disconnect()
+
     // create osc node
     oscNode = actx.createOscillator()
 
+    // convert midi input to freq
+    const keyFreq = mtof(midiNote)
+
     // set freq
-    oscNode.frequency.value = freq
+    oscNode.frequency.value = keyFreq
     oscNode.type = waveForm
     gainNode.gain.value = gain
+
+    // set filer
+    filterNode.frequency.value = filterFreq
     
     // connections
     oscNode.connect(filterNode)
@@ -52,7 +66,6 @@ function App() {
 
   // Filter handlers
   function changeFilter(value:number){
-    console.log(value)
     setFilterFreq(value)
     filterNode.frequency.value = value
   }
@@ -62,8 +75,13 @@ function App() {
     filterNode.Q.value = value
   }
 
+  function changeFilterType(value:BiquadFilterType){
+    setFilterType(value)
+    filterNode.type = value
+  }
+
   return (
-    <MantineProvider withGlobalStyles withNormalizeCSS>
+    <MantineProvider withGlobalStyles withNormalizeCSS theme={{ colorScheme: 'dark' }}>
       <div id='app-container'>
 
         <Container className='main-container'>
@@ -74,31 +92,32 @@ function App() {
           
 
           <HStack>
-            <Button onClick={()=>{startOsc()}}>Start</Button>
+            <Button onClick={()=>{startOsc(64)}}>Start</Button>
             <Button onClick={()=>{oscNode.stop()}}>Stop</Button>
           </HStack>
           
           <br/><br/>
 
-          <HStack>
+          <HStack spacing={30} alignItems={'top'}>
 
+            {/* Oscillator */}
             <VStack>
-              <Text className='text-label'>Freq.</Text>
+              <Badge color='cyan' size='lg'>Freq.</Badge>
               <Slider
                 className='slider-parameter'
-                value={freq}
+                value={oscFreq}
                 onChange={(value:number)=>{
-                  setFreq(value)
+                  setOscFreq(value)
                   oscNode.frequency.value = value
                 }}
                 min={100}
                 max={5000}
-                label={(value) => value}
+                label={(value) => value.toFixed(1)}
                 step={1}/>
 
               <br/>
 
-              <Text className='text-label'>Gain</Text>
+              <Badge color='cyan' size='lg'>Gain</Badge>
               <Slider
                 className='slider-parameter'
                 value={gain}
@@ -113,50 +132,42 @@ function App() {
 
               <br/>
 
-              <Text className='text-label'>Waveform</Text>
-              <Radio.Group
-                value={waveForm}
-                onChange={changeWaveform}
-                name="waveform"
-                className='radio-waveform'
-              >
-                <Radio value="sine" label="Sine" />
-                <Radio value="triangle" label="Triangle" />
-                <Radio value="sawtooth" label="Saw" />
-                <Radio value="square" label="Square" />
-              </Radio.Group>
+              <Badge color='cyan' size='lg'>Waveform</Badge>
+                <Select
+                  value={waveForm}
+                  onChange={changeWaveform}
+                  className='dropdown-select'
+                  data={[
+                    { value: 'sine', label: 'Sine' },
+                    { value: 'triangle', label: 'Triangle' },
+                    { value: 'sawtooth', label: 'Saw' },
+                    { value: 'square', label: 'Square' },
+                  ]}
+                />
             </VStack>
 
             <VStack>
 
-              {/* <ExpoStepSlider
-                steps={[20, 60, 100, 150, 300, 500, 1000, 2000, 4000, 8000, 16000, 20000]}
-                min={1}
-                max={20000}
-                value={filterFreq}
-                setValue={setFilterFreq}
-              /> */}
-
-              <Text className='text-label'>Filter</Text>
+              <Badge color='cyan' size='lg'>Filter</Badge>
               <Slider
                 className='slider-parameter'
                 value={filterKnob}
                 onChange={(value:number)=>{
                   let scaledValue = (Math.exp(Math.log(20) + (value * (Math.log(20000) - Math.log(20)))))
-                  scaledValue = Math.round(scaledValue)
+                  // scaledValue = Math.round(scaledValue)
                   changeFilter(scaledValue)
                   setFilterKnob(value)
                 }}
                 min={0.0}
                 max={1.0}
-                label={(value) => value}
+                label={(value) => value.toFixed(1)}
                 step={0.01}
                 scale={(value:number)=>(Math.exp(Math.log(20) + (value * (Math.log(20000) - Math.log(20)))))}
               />
 
               <br/>
 
-              <Text className='text-label'>Resonance</Text>
+              <Badge color='cyan' size='lg'>Resonance</Badge>
               <Slider
                 className='slider-parameter'
                 value={filterQ}
@@ -167,46 +178,37 @@ function App() {
                 max={10}
                 label={(value) => value}
                 step={1}/>
+
+                <br/>
+
+                <Badge color='cyan' size='lg'>Filter Type</Badge>
+                <Select
+                  value={filterType}
+                  onChange={changeFilterType}
+                  className='dropdown-select'
+                  data={[
+                    { value: 'lowpass', label: 'Lowpass' },
+                    { value: 'highpass', label: 'Highpass' },
+                    { value: 'bandpass', label: 'Bandpass' },
+                    { value: 'lowshelf', label: 'Low Shelf' },
+                    { value: 'highshelf', label: 'High Shelf' },
+                    { value: 'peaking', label: 'Peaking' },
+                    { value: 'notch', label: 'Notch' },
+                    { value: 'allpass', label: 'Allpass' },
+                  ]}
+                />
             </VStack>
 
 
           </HStack>
-          
-          {/* Oscillator */}
-          
-          
 
           <br/>
-
-          {/* Filter */}
-
           
-
-          {/* <Slider
-            // value={attackTime}
-            // onChange={setAttackTime}
-            min={0.0}
-            max={1.0}
-            label={(value) => value.toFixed(1)}
-            step={0.1}
-          />
-
-          <br/>
-
-          <Slider
-            // value={releaseTime}
-            // onChange={setReleaseTime}
-            min={0.0}
-            max={1.0}
-            label={(value) => value.toFixed(1)}
-            step={0.1}
-          /> */}
+          <Keyboard startOsc={startOsc} stopOsc={()=>oscNode.stop()}/>
 
 
         </Container>
         
-        
-
 
       </div>
     </MantineProvider>
@@ -214,59 +216,5 @@ function App() {
 }
 
 export default App
-
-// export interface ExpoStepSliderState {
-//   sliderValue: number;
-// }
-
-// export function ExpoStepSlider({min,max,steps, value, setValue}:any) {
-//   const [points, sliderTransform] = scaleTransform(min, max, steps);
-//   console.log(points);
-
-//   return (
-//     <div >
-//       <div>output: {sliderTransform(value)}</div>
-//       <Slider
-//         value={value}
-//         onChange={(e) => setValue(e)}
-//         min={0}
-//         max={points}
-//       />
-//     </div>
-//   );
-// };
-
-// function scaleTransform(min: number, max: number, intervals: number[]): [number, (input: number) => number] {
-
-//   //determine how many "points" we need
-//   let distributions = intervals.length;
-//   let descretePoints = Math.ceil(
-//     (max - min) / intervals.reduce((total, step) => total + step / distributions, 0)
-//   );
-
-//   return [
-//     descretePoints,
-//     (input: number) => {
-//       let stepTransforms = intervals.map((s, i) => {
-//         let setCount = Math.min(Math.ceil(input - (descretePoints * i / distributions)), Math.round(descretePoints / distributions));
-//         return setCount > 0 ? setCount * s : 0;
-//       });
-
-//       let lastStep = 0;
-//       let out = Math.round(stepTransforms.reduce((total, num, i) => {
-//         if (num) {
-//           lastStep = i;
-//         }
-//         return total + num;
-//       })) + min;
-
-//       let currentUnit = intervals[lastStep];
-//       return Math.min(
-//         Math.round((out / currentUnit)) * currentUnit,  //round to nearest step
-//         max
-//       );
-//     }
-//   ]
-// }
 
 
